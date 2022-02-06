@@ -6,7 +6,7 @@ const Login = () => {
 
   return (
     <div>
-      <button onClick={loginSpotify}>Login With Spotify</button>
+      <button class="login" onClick={loginSpotify}>Login With Spotify</button>
     </div>
   );
 };

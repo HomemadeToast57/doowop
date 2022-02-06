@@ -1,6 +1,7 @@
 import axios from "axios";
 import React, { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import Login from "../components/js/Login";
 
 const AuthContext = React.createContext();
 
@@ -15,6 +16,15 @@ export function AuthProvider({ children }) {
   const [seed, setSeed] = useState({});
   const [recommendations, setRecommendations] = useState({});
   const [changedHistory, setChangedHistory] = useState(false);
+  const [boolArr, setBoolArr] = useState([]);
+
+  const [tracksNotInHistory, setTracksNotInHistory] = useState({});
+  const [tracksWithPreview, setTracksWithPreview] = useState({});
+
+  const [currentTracks, setCurrentTracks] = useState({});
+  const [finalTracks, setFinalTracks] = useState({});
+  const [finalFinalTracks, setFinalFinalTracks] = useState([]);
+
   const numTopItems = 30;
   const maxArtists = 3;
   const maxTracks = 1;
@@ -227,98 +237,18 @@ export function AuthProvider({ children }) {
     };
 
     if (Object.keys(seed).length > 0) {
-      getRecommendations(seed);
+      return getRecommendations(seed);
     }
   }, [seed]);
 
   useEffect(() => {
     const accessToken = localStorage.getItem("accessToken");
 
-    // 1) get songs user has seen
-    const getHistoryJSON = () => {
-      return JSON.parse(localStorage.getItem("history"));
-    };
-
-    // 2) remove songs user has seen from recommendations
-    const removeOldTracks = (tracks) => {
-      //check every track against tracks in localStorage history string by converting to JSON and avoiding duplicates
-      let history = getHistoryJSON();
-
-      if (history) {
-        let newTracks = tracks.filter((track) => {
-          if (!history.includes(track.id)) {
-            return track;
-          }
-          return newTracks;
-        });
-      } else {
-        return tracks;
-      }
-    };
-
-    const removeSongsWithoutPreview = (tracks) => {
-      console.log("removeSongsWithoutPreview", Object.keys(tracks).length);
-      let songsWithPreview = [];
-
-      if (Object.keys(tracks).length > 0) {
-        // console.log(tracks);
-        tracks.forEach((track) => {
-          if (track.preview_url) {
-            songsWithPreview.push(track);
-          }
-        });
-      }
-
-      return songsWithPreview;
-    };
-
-    const removeLikedSongs = (arrayOfBool, tracksObj) => {
-      console.log("removeLikedSongs", arrayOfBool, tracksObj.length);
-      //if a track is true, in arrayOfBool, remove it from tracksObj
-      arrayOfBool.forEach((bool) => {
-        if (bool) {
-          tracksObj.splice(tracksObj.indexOf(bool), 1);
-        }
-      });
-
-      return tracksObj;
-    };
-
-
-    const makeList = (tracks) => {
-      console.log(tracks);
-      let numIndices = Math.ceil(tracks.length / 50);
-      //   console.log(numIndices);
-      let fiftyTracksArray = [];
-
-      for (let i = 0; i < numIndices; i++) {
-        let fiftyTracks = [];
-        for (let j = 0; j < 50 && j < tracks.length; j++) {
-          fiftyTracks.push(tracks[i * 50 + j]);
-        }
-        fiftyTracksArray.push(fiftyTracks);
-      }
-
-      console.log(fiftyTracksArray);
-      fiftyTracksArray.forEach((fifty) => {
-        let setOfFiftyString = "";
-        fifty.forEach((track) => {
-          if (track) {
-            setOfFiftyString += track.id + ",";
-          }
-        });
-        fiftyTracksArray[fiftyTracksArray.indexOf(fifty)] = setOfFiftyString;
-      });
-
-      console.log(fiftyTracksArray);
-      return fiftyTracksArray;
-    };
-
-    const checkLibrary = (tracksString, noRepeatTracks) => {
+    const checkLibrary = (trackStrings) => {
       let arrayOfBool = [];
       try {
-        tracksString.forEach((trackString) => {
-          console.log("trackString", trackString);
+        trackStrings.forEach((trackString) => {
+          // console.log("trackString", trackString);
           //use spotify api to check user's saved tracks
           axios({
             method: "get",
@@ -330,10 +260,12 @@ export function AuthProvider({ children }) {
             },
           })
             .then(async (res) => {
+              console.log("RECOMMENDING");
               console.log(res.data);
               arrayOfBool = [...arrayOfBool, ...res.data];
               console.log(arrayOfBool);
-              return arrayOfBool;
+              await setBoolArr(arrayOfBool);
+              return;
             })
             .catch((err) => {
               console.log(err);
@@ -342,24 +274,123 @@ export function AuthProvider({ children }) {
       } catch (error) {
         console.log(error);
       }
-      return removeLikedSongs(arrayOfBool, noRepeatTracks);
     };
 
-    
-    const getNewTracks = async (tracks) => {
-      let needsPreviewTracks = removeSongsWithoutPreview(tracks);
-      let noRepeatTracks = removeOldTracks(needsPreviewTracks);
-      let tracksString = makeList(noRepeatTracks);
-      console.log(tracksString);
-      //check if tracks are in user's library
-      let boolArr = checkLibrary(tracksString, noRepeatTracks);
-        console.log(boolArr);
+    const makeList = (tracks) => {
+      console.log("IN MAKE LIST", tracks);
+      console.log("TRACK ENTRIES", Object.entries(tracks));
+
+      tracks = Object.entries(tracks);
+      console.log(tracks);
+      let numIndices = Math.ceil(tracks.length / 50);
+      //   console.log(numIndices);
+      let fiftyTracksArray = [];
+
+      for (let i = 0; i < numIndices; i++) {
+        let fiftyTracks = [];
+        for (let j = 0; j < 50 && j < tracks.length; j++) {
+          console.log("TRACKS TO ARRAY", tracks);
+          fiftyTracks.push(tracks[i * 50 + j]);
+        }
+        console.log(fiftyTracks);
+        fiftyTracksArray.push(fiftyTracks);
+      }
+
+      fiftyTracksArray.forEach((fifty) => {
+        let setOfFiftyString = "";
+        fifty.forEach((track) => {
+          if (track) {
+            setOfFiftyString += track[0] + ",";
+          }
+        });
+        fiftyTracksArray[fiftyTracksArray.indexOf(fifty)] = setOfFiftyString;
+      });
+
+      console.log("FIFTY TRACKS ARRAY", fiftyTracksArray);
+
+      return checkLibrary(fiftyTracksArray);
+    };
+
+    // 2) remove songs user has seen from recommendations
+
+    const removeOldTracks = async (tracks) => {
+      //check every track against tracks in localStorage history string by converting to JSON and avoiding duplicates
+      let history = getHistoryJSON();
+      let newTracks = {};
+
+      console.log("HISTORRY", history);
+      if (history) {
+        //make sure id is not in the history
+        for (var track in tracks) {
+          if (!(track in history)) {
+            newTracks[track] = tracks[track];
+          }
+        }
+        console.log("REMOVED OLD TRACKS", newTracks);
+
+        await setFinalTracks(newTracks);
+        return makeList(newTracks);
+      }
+      await setFinalTracks(tracks);
+      return makeList(tracks);
+    };
+
+    // 1) get songs user has seen
+
+    const removeSongsWithoutPreview = (tracks) => {
+      console.log("REMOVE PREVIEW INITIAL", tracks);
+      // console.log("removeSongsWithoutPreview", Object.keys(tracks).length);
+      let songsWithPreview = {};
+
+      //if song has preview url, add to new object
+      tracks.forEach((track) => {
+        if (track.preview_url) {
+          songsWithPreview[track.id] = track;
+        }
+      });
+      console.log(songsWithPreview);
+
+      return removeOldTracks(songsWithPreview);
+    };
+
+    const getHistoryJSON = () => {
+      return JSON.parse(localStorage.getItem("history"));
     };
 
     if (Object.keys(recommendations).length > 0) {
-      getNewTracks(recommendations.tracks);
+      removeSongsWithoutPreview(recommendations.tracks);
     }
   }, [recommendations]);
+
+  useEffect(() => {
+    console.log("HEHEHEHEHEHEHEHEHEHEHEHEHEHEHEHEHEHEHHHEHEHEH");
+    const removeLikedSongs = () => {
+      console.log("IN REMOVE LIKED SONGS");
+      let tracksObjToArray = Object.entries(finalTracks);
+      console.log("TRACKS OBJ TO ARRAY", tracksObjToArray);
+      console.log("removeLikedSongs", boolArr, finalTracks.length);
+      //if a track is true, in arrayOfBool, remove it from tracksObj
+      boolArr.forEach((bool) => {
+        console.log(bool, "BOOL");
+        if (bool) {
+          console.log("TRACKSSSS", tracksObjToArray);
+          tracksObjToArray.splice(tracksObjToArray.indexOf(bool), 1);
+          console.log("removed");
+        }
+      });
+
+      console.log(finalTracks, boolArr);
+      console.log("😂", tracksObjToArray);
+      return tracksObjToArray;
+    };
+    return () => setFinalFinalTracks(removeLikedSongs(boolArr, finalTracks));
+  }, [finalTracks, boolArr]);
+
+  useEffect(() => {
+    if (finalFinalTracks.length > 0) {
+      console.log("SUCCESS", finalFinalTracks);
+    }
+  }, [finalFinalTracks]);
 
   const logout = () => {
     localStorage.removeItem("accessToken");
@@ -370,10 +401,33 @@ export function AuthProvider({ children }) {
     navigate("/login");
   };
 
+  const saveTrackToLibrary = (trackID) => {
+    const accessToken = localStorage.getItem("accessToken");
+    axios({
+      method: "put",
+      url: "https://api.spotify.com/v1/me/tracks?ids=" + trackID,
+      headers: {
+        Authorization: "Bearer " + accessToken,
+      },
+    })
+      .then((res) => {
+        console.log(res);
+      })
+      .catch((err) => {
+        console.log(err);
+      });
+  };
+
   const value = {
     loginSpotify,
     getReturnParamsFromSpotifyAuth,
     logout,
+    finalFinalTracks,
+    saveTrackToLibrary,
   };
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {localStorage.getItem("accessToken") ? (finalFinalTracks.length > 0 ? (<div>{children}</div>) : <h1>Loading...</h1>) : <Login />}
+    </AuthContext.Provider>
+  );
 }
