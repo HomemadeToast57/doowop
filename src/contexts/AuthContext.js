@@ -1,5 +1,4 @@
 import axios from "axios";
-import { Obj } from "prelude-ls";
 import React, { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -15,7 +14,7 @@ export function AuthProvider({ children }) {
   const [userProfileObj, setUserProfileObj] = useState({});
   const [seed, setSeed] = useState({});
   const [recommendations, setRecommendations] = useState({});
-
+  const [changedHistory, setChangedHistory] = useState(false);
   const numTopItems = 30;
   const maxArtists = 3;
   const maxTracks = 1;
@@ -24,7 +23,8 @@ export function AuthProvider({ children }) {
   var client_id = "d8844014abe44653b437f74767a81bec";
   var redirect_uri = "http://localhost:3000/";
 
-  var scope = "user-read-private user-read-email user-top-read";
+  var scope =
+    "user-read-private user-read-email user-top-read user-library-read user-library-modify";
 
   var url = "https://accounts.spotify.com/authorize";
   url += "?response_type=token";
@@ -135,9 +135,9 @@ export function AuthProvider({ children }) {
     };
 
     if (Object.keys(userProfileObj).length > 0) {
-    return fetchTopItems();
+      return fetchTopItems();
     } else {
-       return console.log("No profile");
+      return console.log("No profile");
     }
   }, [userProfileObj]);
 
@@ -205,16 +205,19 @@ export function AuthProvider({ children }) {
       try {
         await axios({
           method: "get",
-          url: "https://api.spotify.com/v1/recommendations/?seed_artists=" + artists + "&seed_tracks=" + tracks + "&seed_genres=" + genres,
+          url:
+            "https://api.spotify.com/v1/recommendations/?seed_artists=" +
+            artists +
+            "&seed_tracks=" +
+            tracks +
+            "&seed_genres=" +
+            genres +
+            "&limit=" +
+            100,
           headers: {
             Authorization: "Bearer " + accessToken,
           },
-        //   limit: 20,
-        //   seed_artists: artists,
-        //   seed_genres: genres,
-        //   seed_tracks: tracks,
         }).then(async (res) => {
-          console.log(res.data);
           await setRecommendations(res.data);
           return;
         });
@@ -227,6 +230,136 @@ export function AuthProvider({ children }) {
       getRecommendations(seed);
     }
   }, [seed]);
+
+  useEffect(() => {
+    const accessToken = localStorage.getItem("accessToken");
+
+    // 1) get songs user has seen
+    const getHistoryJSON = () => {
+      return JSON.parse(localStorage.getItem("history"));
+    };
+
+    // 2) remove songs user has seen from recommendations
+    const removeOldTracks = (tracks) => {
+      //check every track against tracks in localStorage history string by converting to JSON and avoiding duplicates
+      let history = getHistoryJSON();
+
+      if (history) {
+        let newTracks = tracks.filter((track) => {
+          if (!history.includes(track.id)) {
+            return track;
+          }
+          return newTracks;
+        });
+      } else {
+        return tracks;
+      }
+    };
+
+    const removeSongsWithoutPreview = (tracks) => {
+      console.log("removeSongsWithoutPreview", Object.keys(tracks).length);
+      let songsWithPreview = [];
+
+      if (Object.keys(tracks).length > 0) {
+        // console.log(tracks);
+        tracks.forEach((track) => {
+          if (track.preview_url) {
+            songsWithPreview.push(track);
+          }
+        });
+      }
+
+      return songsWithPreview;
+    };
+
+    const removeLikedSongs = (arrayOfBool, tracksObj) => {
+      console.log("removeLikedSongs", arrayOfBool, tracksObj.length);
+      //if a track is true, in arrayOfBool, remove it from tracksObj
+      arrayOfBool.forEach((bool) => {
+        if (bool) {
+          tracksObj.splice(tracksObj.indexOf(bool), 1);
+        }
+      });
+
+      return tracksObj;
+    };
+
+
+    const makeList = (tracks) => {
+      console.log(tracks);
+      let numIndices = Math.ceil(tracks.length / 50);
+      //   console.log(numIndices);
+      let fiftyTracksArray = [];
+
+      for (let i = 0; i < numIndices; i++) {
+        let fiftyTracks = [];
+        for (let j = 0; j < 50 && j < tracks.length; j++) {
+          fiftyTracks.push(tracks[i * 50 + j]);
+        }
+        fiftyTracksArray.push(fiftyTracks);
+      }
+
+      console.log(fiftyTracksArray);
+      fiftyTracksArray.forEach((fifty) => {
+        let setOfFiftyString = "";
+        fifty.forEach((track) => {
+          if (track) {
+            setOfFiftyString += track.id + ",";
+          }
+        });
+        fiftyTracksArray[fiftyTracksArray.indexOf(fifty)] = setOfFiftyString;
+      });
+
+      console.log(fiftyTracksArray);
+      return fiftyTracksArray;
+    };
+
+    const checkLibrary = (tracksString, noRepeatTracks) => {
+      let arrayOfBool = [];
+      try {
+        tracksString.forEach((trackString) => {
+          console.log("trackString", trackString);
+          //use spotify api to check user's saved tracks
+          axios({
+            method: "get",
+            url:
+              "https://api.spotify.com/v1/me/tracks/contains?ids=" +
+              trackString,
+            headers: {
+              Authorization: "Bearer " + accessToken,
+            },
+          })
+            .then(async (res) => {
+              console.log(res.data);
+              arrayOfBool = [...arrayOfBool, ...res.data];
+              console.log(arrayOfBool);
+              return arrayOfBool;
+            })
+            .catch((err) => {
+              console.log(err);
+            });
+        });
+      } catch (error) {
+        console.log(error);
+      }
+      return removeLikedSongs(arrayOfBool, noRepeatTracks);
+    };
+
+    
+    const getNewTracks = async (tracks) => {
+      let needsPreviewTracks = removeSongsWithoutPreview(tracks);
+      let noRepeatTracks = removeOldTracks(needsPreviewTracks);
+      let tracksString = makeList(noRepeatTracks);
+      console.log(tracksString);
+      //check if tracks are in user's library
+      let boolArr = checkLibrary(tracksString, noRepeatTracks);
+        console.log(boolArr);
+    };
+
+    if (Object.keys(recommendations).length > 0) {
+      getNewTracks(recommendations.tracks);
+    }
+  }, [recommendations]);
 
   const logout = () => {
     localStorage.removeItem("accessToken");
@@ -241,7 +374,6 @@ export function AuthProvider({ children }) {
     loginSpotify,
     getReturnParamsFromSpotifyAuth,
     logout,
-    recommendations,
   };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

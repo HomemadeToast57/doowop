@@ -26,13 +26,7 @@ const Home = () => {
 
   return (
     <div>
-      <button onClick={popupHash}>Alert Access Token</button>
-      <button onClick={() => {
-        setCount(count + 1);
-      }}>Add Number</button>
-      <button onClick={fetchTopItems}>Fetch Top Items</button>
       <button onClick={logout}>logout</button>
-      <h1>{count}</h1>
     </div>
   );
 };
