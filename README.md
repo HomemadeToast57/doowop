@@ -1,4 +1,5 @@
 # Doowop
+### Does your music feel stuck in repeat? Find what's out there for you with doowop!
 
 ![Screen Shot 2022-02-06 at 11 59 43 AM](https://user-images.githubusercontent.com/54961512/152691947-0fe60b00-5509-41e7-aac9-131d503421e9.png)
 
