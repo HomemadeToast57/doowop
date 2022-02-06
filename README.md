@@ -3,7 +3,7 @@
 
 ![Screen Shot 2022-02-06 at 11 59 43 AM](https://user-images.githubusercontent.com/54961512/152691947-0fe60b00-5509-41e7-aac9-131d503421e9.png)
 
-Run using 'npm start' in the root directory.
+Run using 'npm i react-scripts' and then 'npm start' commands in the root directory.
 
 ### Developed by Jack Singer, Noa Rogoszinski, Jingxin Song, and Brian Ni for 2022 HackBU (SUNY Binghamton) Hackathon
 
