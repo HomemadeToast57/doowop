@@ -31,7 +31,7 @@ export function AuthProvider({ children }) {
   const maxGenres = 1;
 
   var client_id = "d8844014abe44653b437f74767a81bec";
-  var redirect_uri = "http://localhost:3000/";
+  var redirect_uri = "https://doowop.netlify.app/";
 
   var scope =
     "user-read-private user-read-email user-top-read user-library-read user-library-modify";
